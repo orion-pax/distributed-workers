@@ -79,7 +79,7 @@ public class DistributedWorkerApplication implements CommandLineRunner {
         String baseUrl = "https://httpstat.us/";
         int min = 1;
         List<Integer> statusCodes = Arrays.stream(HttpStatus.values()).map(HttpStatus::value).collect(Collectors.toList());
-        int max = statusCodes.size();
+        int max = statusCodes.size()-1;
         int range = max - min + 1;
         int randomNumber = (int) (Math.random() * range) + min;
         return baseUrl + statusCodes.get(randomNumber);
