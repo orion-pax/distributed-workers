@@ -2,6 +2,7 @@ package com.assignment.proxify.distributedworker;
 
 import com.assignment.proxify.distributedworker.enums.Status;
 import com.assignment.proxify.distributedworker.model.Job;
+import com.assignment.proxify.distributedworker.service.IWorker;
 import com.assignment.proxify.distributedworker.service.JobService;
 import com.assignment.proxify.distributedworker.worker.Worker;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,10 +27,15 @@ public class DistributedWorkerApplication implements CommandLineRunner {
 
     private static final Logger LOGGER = Logger.getLogger(DistributedWorkerApplication.class.getName());
 
-    @Autowired
     private JobService jobService;
-    @Autowired
     private RestTemplate restTemplate;
+    private IWorker worker;
+
+    public DistributedWorkerApplication(JobService jobService, RestTemplate restTemplate, IWorker worker) {
+        this.jobService = jobService;
+        this.restTemplate = restTemplate;
+        this.worker = worker;
+    }
 
     public static void main(String[] args) {
         SpringApplication.run(DistributedWorkerApplication.class, args);
@@ -63,10 +69,7 @@ public class DistributedWorkerApplication implements CommandLineRunner {
 
     private void executeJobs() {
         ExecutorService executorService = Executors.newFixedThreadPool(5);
-        IntStream.range(0, 5).forEach(value -> {
-            Worker worker = new Worker(jobService, restTemplate);
-            executorService.execute(worker);
-        });
+        IntStream.range(0, 5).forEach(value -> executorService.execute(worker));
         executorService.shutdown();
         while (!executorService.isTerminated()) ;
         LOGGER.log(Level.INFO,":: Workers have finished executing requests");

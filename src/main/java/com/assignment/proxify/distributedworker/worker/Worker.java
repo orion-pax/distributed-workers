@@ -2,9 +2,12 @@ package com.assignment.proxify.distributedworker.worker;
 
 import com.assignment.proxify.distributedworker.enums.Status;
 import com.assignment.proxify.distributedworker.model.Job;
+import com.assignment.proxify.distributedworker.service.IWorker;
 import com.assignment.proxify.distributedworker.service.JobService;
 import org.springframework.http.*;
+import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.client.UnknownHttpStatusCodeException;
 
@@ -14,7 +17,8 @@ import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class Worker implements Runnable {
+@Service
+public class Worker implements IWorker {
     private static final Logger LOGGER = Logger.getLogger(Worker.class.getName());
     private JobService jobService;
     private RestTemplate restTemplate;
@@ -25,7 +29,6 @@ public class Worker implements Runnable {
     }
 
     @Override
-    @Transactional
     public void run() {
         try {
             Optional<Job> optionalJob = getNextAvailableJob();
@@ -36,7 +39,7 @@ public class Worker implements Runnable {
                     job = jobService.update(job).get();
                     HttpStatus responseStatus = callJobUrl(job.getUrl());
                     job.setHttp_code(responseStatus != null ? String.valueOf(responseStatus.value()) : null);
-                    job.setStatus((responseStatus != null && responseStatus.equals(HttpStatus.OK)) ? Status.DONE : Status.ERROR);
+                    job.setStatus(responseStatus != null ? Status.DONE : Status.ERROR);
                     jobService.update(job);
                     LOGGER.log(Level.INFO, String.format("Job %d completed with status %s", job.getId(), job.getStatus()));
                 } catch (Exception e) {
@@ -50,7 +53,8 @@ public class Worker implements Runnable {
         }
     }
 
-    private HttpStatus callJobUrl(String jobUrl) {
+    @Override
+    public HttpStatus callJobUrl(String jobUrl) {
         HttpHeaders headers = new HttpHeaders();
         headers.add("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2840.99 Safari/537.36");
         HttpEntity<String> entity = new HttpEntity<String>("parameters", headers);
@@ -60,7 +64,7 @@ public class Worker implements Runnable {
             ResponseEntity<String> response = restTemplate.exchange(jobUrl, HttpMethod.GET, entity, String.class);
             responseStatus = response.getStatusCode();
 
-        } catch (HttpClientErrorException e) {
+        } catch (HttpClientErrorException | HttpServerErrorException e) {
             LOGGER.log(Level.SEVERE, jobUrl + ":: " + e.getMessage());
             e.printStackTrace();
             responseStatus = e.getStatusCode();
@@ -76,7 +80,8 @@ public class Worker implements Runnable {
         return responseStatus;
     }
 
-    private Optional<Job> getNextAvailableJob() {
+    @Override
+    public Optional<Job> getNextAvailableJob() {
         List<Job> jobs = jobService.findAllByStatus(Status.NEW);
         return !jobs.isEmpty() ? Optional.of(jobs.get(0)) : Optional.empty();
     }
